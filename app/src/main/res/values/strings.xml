@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HST</string>
+    <string name="login_title">HST SRL</string>
+    <string name="login_subtitle">Higiene y Seguridad en el Trabajo</string>
+    <string name="email_hint">Email</string>
+    <string name="password_hint">Contraseña</string>
+    <string name="login_button">Ingresar</string>
+    <string name="dashboard_title">Herramientas</string>
+    <string name="tool_simulacro">Simulacro</string>
+    <string name="tool_simulacro_desc">Informes de simulacro de evacuación con PDF y envío por email</string>
+    <string name="tool_extintores">Extintores</string>
+    <string name="tool_extintores_desc">Visor de extintores, dashboard e informes de control</string>
+    <string name="logout">Cerrar sesión</string>
+    <string name="update_title">Actualización disponible</string>
+    <string name="update_message">Hay una nueva versión de la app. ¿Deseas actualizar?</string>
+    <string name="update_yes">Actualizar</string>
+    <string name="update_no">Después</string>
+    <string name="loading">Cargando…</string>
+    <string name="no_internet">Sin conexión a internet</string>
+    <string name="login_error">Email o contraseña incorrectos</string>
+</resources>
