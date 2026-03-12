@@ -12,8 +12,8 @@ android {
         applicationId = "ar.com.hst.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 13
-        versionName = "1.5.5"
+        versionCode = 14
+        versionName = "1.5.6"
     }
 
     signingConfigs {
