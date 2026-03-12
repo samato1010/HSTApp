@@ -46,6 +46,13 @@ class DashboardActivity : AppCompatActivity() {
             description = "Relevamiento visual de desvíos con fotos y PDF",
             iconRes = R.drawable.ic_relevamiento,
             url = "https://hst.ar/asociados/herramientas/relevamiento.php"
+        ),
+        Tool(
+            id = "pat",
+            name = "Medición de PAT",
+            description = "Puesta a tierra - Protocolo SRT 900/15",
+            iconRes = R.drawable.ic_pat,
+            url = "https://hst.ar/asociados/herramientas/medicion-pat.php"
         )
     )
 
