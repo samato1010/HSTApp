@@ -42,6 +42,8 @@ class ExtintoresActivity : AppCompatActivity() {
     private val barcodeScanner = BarcodeScanning.getClient()
     private var lastQrUrl: String = ""
     private var lastQrTime: Long = 0
+    // Set de QRs ya controlados en esta sesión para evitar duplicados
+    private val controlledQrUrls = mutableSetOf<String>()
 
     private val cameraPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -64,9 +66,34 @@ class ExtintoresActivity : AppCompatActivity() {
         setupControlView()
         setupCameraView()
 
-        // Start on view 0 (select cliente)
-        b.viewFlipper.displayedChild = 0
-        loadClientes("")
+        // Check if launched from Relevamiento with pre-selected client/establishment
+        val extraClienteId = intent.getIntExtra("clienteId", -1)
+        val extraEstId = intent.getIntExtra("establecimientoId", -1)
+        val extraClienteName = intent.getStringExtra("clienteName")
+        val extraEstName = intent.getStringExtra("estName")
+
+        if (extraClienteId > 0 && extraEstId > 0) {
+            // Pre-select client and establishment, skip to control view
+            selectedCliente = ClienteItem(
+                itemId = extraClienteId,
+                razonSocial = extraClienteName,
+                nombreCorto = null, cuit = null, localidad = null,
+                provincia = null, activo = null
+            )
+            selectedEstablecimiento = EstablecimientoItem(
+                itemId = extraEstId,
+                denominacion = extraEstName,
+                nroSucursal = null, domicilio = null, localidad = null,
+                estado = null
+            )
+            controlCount = 0
+            updateControlInfo()
+            b.viewFlipper.displayedChild = 2
+        } else {
+            // Normal flow: start on view 0 (select cliente)
+            b.viewFlipper.displayedChild = 0
+            loadClientes("")
+        }
     }
 
     // ===================== VIEW 0: SELECT CLIENTE =====================
@@ -95,6 +122,14 @@ class ExtintoresActivity : AppCompatActivity() {
     }
 
     private fun loadClientes(query: String) {
+        if (!repo.isOnline()) {
+            b.progressClientes.visibility = View.GONE
+            b.emptyClientes.visibility = View.VISIBLE
+            b.emptyClientes.text = "Sin conexión a internet"
+            b.recyclerClientes.adapter = null
+            return
+        }
+
         b.progressClientes.visibility = View.VISIBLE
         b.emptyClientes.visibility = View.GONE
 
@@ -149,6 +184,14 @@ class ExtintoresActivity : AppCompatActivity() {
     }
 
     private fun loadEstablecimientos(clienteId: Int, query: String) {
+        if (!repo.isOnline()) {
+            b.progressEst.visibility = View.GONE
+            b.emptyEst.visibility = View.VISIBLE
+            b.emptyEst.text = "Sin conexión a internet"
+            b.recyclerEstablecimientos.adapter = null
+            return
+        }
+
         b.progressEst.visibility = View.VISIBLE
         b.emptyEst.visibility = View.GONE
 
@@ -207,7 +250,7 @@ class ExtintoresActivity : AppCompatActivity() {
             val pending = repo.contarPendientes()
             if (pending > 0) {
                 b.pendingBadge.visibility = View.VISIBLE
-                b.pendingBadge.text = "⏳ $pending pendientes de sincronizar"
+                b.pendingBadge.text = "\u23F3 $pending pendientes de sincronizar"
             } else {
                 b.pendingBadge.visibility = View.GONE
             }
@@ -275,7 +318,7 @@ class ExtintoresActivity : AppCompatActivity() {
                         break
                     } else {
                         runOnUiThread {
-                            b.scanStatus.text = "QR no válido (no es extintor AGC)"
+                            b.scanStatus.text = "QR no v\u00e1lido (no es extintor AGC)"
                         }
                     }
                 }
@@ -297,6 +340,7 @@ class ExtintoresActivity : AppCompatActivity() {
 
     private fun handleQrDetected(rawUrl: String) {
         val now = System.currentTimeMillis()
+        // Debounce: ignorar mismo QR dentro de 3 segundos
         if (rawUrl == lastQrUrl && now - lastQrTime < 3000) return
 
         lastQrUrl = rawUrl
@@ -306,10 +350,18 @@ class ExtintoresActivity : AppCompatActivity() {
         var url = rawUrl.replace(Regex("[\\x00-\\x1f\\x7f]"), "")
         if (url.startsWith("http://")) url = url.replaceFirst("http://", "https://")
 
-        // Vibrate
-        @Suppress("DEPRECATION")
+        // Verificar duplicado en esta sesión
+        if (controlledQrUrls.contains(url)) {
+            runOnUiThread {
+                showMsg("Este extintor ya fue controlado en esta sesión")
+                b.scanStatus.text = "QR duplicado - ya controlado"
+            }
+            return
+        }
+
+        // Vibrate usando VibrationEffect para API 26+
         val vibrator = getSystemService(VIBRATOR_SERVICE) as? Vibrator
-        vibrator?.vibrate(150)
+        vibrator?.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
 
         // Stop camera and fetch AGC data
         stopCamera()
@@ -364,7 +416,7 @@ class ExtintoresActivity : AppCompatActivity() {
         }
 
         val title = if (agcData?.nroExtintor != null) {
-            "Control QR — Ext. ${agcData.nroExtintor}"
+            "Control QR \u2014 Ext. ${agcData.nroExtintor}"
         } else if (modo == "manual") "Control Manual" else "Control por QR"
 
         val dialog = AlertDialog.Builder(this, R.style.Theme_HSTApp)
@@ -439,10 +491,10 @@ class ExtintoresActivity : AppCompatActivity() {
             data.capacidad?.let { "Capacidad" to it },
             data.fabricante?.let { "Fabricante" to it },
             data.recargadora?.let { "Recargadora" to it },
-            data.fechaFabricacion?.let { "Fabricación" to it },
+            data.fechaFabricacion?.let { "Fabricaci\u00f3n" to it },
             data.fechaMantenimiento?.let { "Mantenimiento" to it },
             data.vencMantenimiento?.let { "Venc. Mant." to it },
-            data.vencVidaUtil?.let { "Venc. Vida Útil" to it },
+            data.vencVidaUtil?.let { "Venc. Vida \u00datil" to it },
             data.vencPh?.let { "Venc. PH" to it },
             data.domicilio?.let { "Domicilio" to it },
             data.uso?.let { "Uso" to it }
@@ -572,8 +624,13 @@ class ExtintoresActivity : AppCompatActivity() {
         vencPh: String? = null,
         modo: String
     ) {
-        val cliente = selectedCliente ?: return
-        val est = selectedEstablecimiento ?: return
+        val cliente = selectedCliente
+        val est = selectedEstablecimiento
+        if (cliente == null || est == null) {
+            showMsg("Error: seleccione cliente y establecimiento")
+            Log.e("ExtCtrl", "submitControl sin cliente/est seleccionado")
+            return
+        }
 
         lifecycleScope.launch {
             val result = repo.enviarControl(
@@ -593,6 +650,8 @@ class ExtintoresActivity : AppCompatActivity() {
             )
 
             controlCount++
+            // Registrar QR como ya controlado para evitar duplicados
+            if (urlQr != null) controlledQrUrls.add(urlQr)
             updateControlInfo()
 
             when (result) {
@@ -600,7 +659,7 @@ class ExtintoresActivity : AppCompatActivity() {
                     showSiguienteDialog("Control enviado correctamente (${result.totalControles} total)")
                 }
                 is ExtintoresRepository.ControlResult.GuardadoOffline -> {
-                    showSiguienteDialog("Control guardado offline (se sincronizará luego)")
+                    showSiguienteDialog("Control guardado offline (se sincronizar\u00e1 luego)")
                 }
                 is ExtintoresRepository.ControlResult.Error -> {
                     showSiguienteDialog("Guardado offline. Error: ${result.mensaje}")
@@ -613,8 +672,8 @@ class ExtintoresActivity : AppCompatActivity() {
 
     private fun showSiguienteDialog(message: String) {
         AlertDialog.Builder(this)
-            .setTitle("✅ Control registrado")
-            .setMessage("$message\n\n¿Desea controlar otro extintor?")
+            .setTitle("\u2705 Control registrado")
+            .setMessage("$message\n\n\u00bfDesea controlar otro extintor?")
             .setPositiveButton("Siguiente") { _, _ ->
                 b.viewFlipper.displayedChild = 2
             }
@@ -644,9 +703,10 @@ class ExtintoresActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+        searchHandler.removeCallbacksAndMessages(null)
         stopCamera()
         barcodeScanner.close()
+        super.onDestroy()
     }
 }
 
@@ -691,7 +751,7 @@ class EstablecimientoAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        holder.b.estDenominacion.text = item.denominacion ?: "Sin denominación"
+        holder.b.estDenominacion.text = item.denominacion ?: "Sin denominaci\u00f3n"
         val dir = listOfNotNull(item.domicilio, item.localidad).joinToString(", ")
         holder.b.estDomicilio.text = dir
         if (!item.nroSucursal.isNullOrBlank()) {

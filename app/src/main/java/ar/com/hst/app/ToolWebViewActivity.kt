@@ -15,9 +15,29 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import ar.com.hst.app.databinding.ActivityToolWebviewBinding
+import ar.com.hst.app.extintores.ExtintoresActivity
 import java.io.File
 
 class ToolWebViewActivity : AppCompatActivity() {
+
+    // JavaScript bridge for WebView ↔ Native communication
+    inner class HSTBridge {
+        @android.webkit.JavascriptInterface
+        fun openExtintores(clienteId: Int, establecimientoId: Int, clienteName: String, estName: String) {
+            runOnUiThread {
+                val intent = Intent(this@ToolWebViewActivity, ExtintoresActivity::class.java).apply {
+                    putExtra("clienteId", clienteId)
+                    putExtra("establecimientoId", establecimientoId)
+                    putExtra("clienteName", clienteName)
+                    putExtra("estName", estName)
+                }
+                startActivity(intent)
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun isApp(): Boolean = true
+    }
 
     private lateinit var b: ActivityToolWebviewBinding
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
@@ -191,6 +211,7 @@ class ToolWebViewActivity : AppCompatActivity() {
             }
         }
 
+        b.webView.addJavascriptInterface(HSTBridge(), "HSTApp")
         b.webView.loadUrl(url)
     }
 

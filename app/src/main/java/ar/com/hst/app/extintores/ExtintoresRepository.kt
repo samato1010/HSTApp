@@ -14,6 +14,10 @@ class ExtintoresRepository(context: Context) {
     private val api = ExtintoresApi.create(session)
     private val dao = HstDatabase.get(ctx).controlDao()
 
+    companion object {
+        private const val TAG = "ExtRepo"
+    }
+
     suspend fun getClientes(query: String? = null, page: Int = 1): ClientesResponse {
         return try {
             api.getClientes(q = query, page = page)
@@ -143,7 +147,8 @@ class ExtintoresRepository(context: Context) {
                     dao.marcarError(p.id)
                     fail++
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Error syncing control ${p.id}: ${e.message}")
                 dao.marcarError(p.id)
                 fail++
             }
@@ -161,11 +166,13 @@ class ExtintoresRepository(context: Context) {
             try {
                 val me = api.refreshSession()
                 if (me.csrf != null) session.csrfToken = me.csrf
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Error refreshing CSRF token: ${e.message}")
+            }
         }
     }
 
-    private fun isOnline(): Boolean {
+    fun isOnline(): Boolean {
         val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val net = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(net) ?: return false
